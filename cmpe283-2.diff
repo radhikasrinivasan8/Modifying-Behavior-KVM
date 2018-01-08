@@ -1,0 +1,50 @@
+diff --git a/arch/x86/kvm/cpuid.c b/arch/x86/kvm/cpuid.c
+index 0099e10eb045..84ce828ddaf1 100644
+--- a/arch/x86/kvm/cpuid.c
++++ b/arch/x86/kvm/cpuid.c
+@@ -888,6 +888,8 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
+ }
+ EXPORT_SYMBOL_GPL(kvm_cpuid);
+ 
++bool toggle_cmpe = false;
++
+ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
+ {
+ 	u32 eax, ebx, ecx, edx;
+@@ -897,11 +899,31 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
+ 
+ 	eax = kvm_register_read(vcpu, VCPU_REGS_RAX);
+ 	ecx = kvm_register_read(vcpu, VCPU_REGS_RCX);
+-	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+-	kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
+-	kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
+-	kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
+-	kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
++	if(eax == 0 && toggle_cmpe)
++	{
++		// set ebx to 'CMPE', set ecx to 'CMPE', set edx to '_283' for little endian
++		ebx = 0x45504d43;
++		ecx = 0x45504d43;
++		edx = 0x3338325f;
++		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
++		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
++		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
++		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
++		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
++	}
++	else if ( eax == 0x4FFFFFFF )
++	{
++		toggle_cmpe = !toggle_cmpe;
++	}
++	else
++        {	
++		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
++		kvm_register_write(vcpu, VCPU_REGS_RAX, eax);
++		kvm_register_write(vcpu, VCPU_REGS_RBX, ebx);
++		kvm_register_write(vcpu, VCPU_REGS_RCX, ecx);
++		kvm_register_write(vcpu, VCPU_REGS_RDX, edx);
++	}
++
+ 	return kvm_skip_emulated_instruction(vcpu);
+ }
+ EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
